@@ -364,6 +364,59 @@ for rel, cid, cname, color in COMMODITIES:
     commodities.append(db)
     report.append((cname, len(sections), total, str(maxdate)))
 
+# ---------- 交叉去重（同一份数据只保留一处） ----------
+import hashlib
+
+def _fp(ch):
+    """图表数据指纹：labels 长度 + 各年份数值序列"""
+    ser = ch.get("series") or {}
+    parts = []
+    for y in sorted(ser.keys()):
+        parts.append(y + ":" + ",".join("" if v is None else str(v) for v in ser[y]))
+    key = str(len(ch.get("labels") or [])) + "#" + "|".join(parts)
+    return hashlib.md5(key.encode("utf-8")).hexdigest()[:12]
+
+def _dup_score(com, sheet, ch):
+    """重复时该保留哪一份：品种自身 > 化工基差；图表多的品种视为主场；价格类板块优先"""
+    v = 0.0
+    if com["id"] == "basis":
+        v -= 1000
+    else:
+        v += min(com.get("chartCount", 0), 120) * 0.6
+    t = sheet["title"]
+    if re.search(r"现货|价格|基差|期现|期货", t): v += 30
+    if re.search(r"供需|库存|开工|产量|进出口|成本|利润", t): v += 20
+    if re.search(r"综合指标|对比|总览", t): v -= 30
+    return v
+
+_slots = {}
+for _com in commodities:
+    for _sheet in _com["sheets"]:
+        for _ch in _sheet["charts"]:
+            _slots.setdefault(_fp(_ch), []).append((_com, _sheet, _ch))
+
+_drop = set()
+_dup_groups = 0
+for _k, _g in _slots.items():
+    if len(_g) < 2:
+        continue
+    _dup_groups += 1
+    _best = max(_g, key=lambda t: _dup_score(*t))
+    for _com, _sheet, _ch in _g:
+        if _ch is not _best[2]:
+            _drop.add(id(_ch))
+
+_removed = 0
+for _com in commodities:
+    for _sheet in _com["sheets"]:
+        _before = len(_sheet["charts"])
+        _sheet["charts"] = [c for c in _sheet["charts"] if id(c) not in _drop]
+        _removed += _before - len(_sheet["charts"])
+    _com["sheets"] = [s for s in _com["sheets"] if s["charts"]]
+    _com["chartCount"] = sum(len(s["charts"]) for s in _com["sheets"])
+commodities = [c for c in commodities if c["sheets"]]
+print(f"去重：{_dup_groups} 组重复，删除 {_removed} 张")
+
 db = {"commodities": commodities}
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("window.DB = " + json.dumps(db, ensure_ascii=False, separators=(",", ":")) + ";")
