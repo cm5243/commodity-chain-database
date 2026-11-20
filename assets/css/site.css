@@ -312,7 +312,7 @@ table.dt tbody tr:hover td, table.dt tbody tr:hover th { background: var(--panel
 }
 .md code {
   font-family: var(--mono); font-size: 13.5px; background: #f1f3f7;
-  padding: 1px 6px; border-radius: 4px; color: #b4530a;
+  padding: 1px 6px; border-radius: 4px; color: #c0392b;
 }
 .md pre {
   background: #f7f9fc; border: 1px solid var(--line); border-radius: 10px;
@@ -501,7 +501,7 @@ table.bt tbody th {
   color: var(--text-2); font-weight: 500; min-width: 130px;
 }
 table.bt tr.section th {
-  background: #f0f3f8; color: #6b4e0d; font-weight: 700;
+  background: #f0f3f8; color: #c0392b; font-weight: 700;
   font-size: 12.5px; letter-spacing: .5px; text-align: left;
 }
 table.bt tbody tr:hover th { background: var(--panel-2); }
