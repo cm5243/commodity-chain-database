@@ -126,14 +126,19 @@ def detect_freq(series):
     if med <= 45: return "month"
     return "year"
 
-def build_chart(name, unit, series, src="原始数据", max_years=5):
+# 数据止于该日之前的图表视为「停更」，整条丢弃（用户 2026-11-20 要求）
+CUTOFF = datetime.date(2025, 1, 1)
+
+def build_chart(name, unit, series, src="原始数据", max_years=None):
     if not series:
+        return None
+    if max(d for d, _ in series) < CUTOFF:
         return None
     freq = detect_freq(series)
     full_n = len(series)
     full_range = f"{series[0][0]}~{series[-1][0]}"
     years_all = sorted({d.year for d, _ in series})
-    years = [str(y) for y in years_all[-max_years:]]
+    years = [str(y) for y in (years_all if max_years is None else years_all[-max_years:])]
     yset = set(int(y) for y in years)
     pts = [(d, v) for d, v in series if d.year in yset]
     if freq == "year":

@@ -275,15 +275,19 @@ def detect_freq(series):
     return "year"
 
 # ---------- 季节性对齐 ----------
-def build_chart(key, max_years=5):
+# 数据止于该日之前的图表视为「停更」，整条丢弃（用户 2026-11-20 要求）
+CUTOFF = datetime.date(2025, 1, 1)
+
+def build_chart(key, max_years=None):
     d = data[key]
     series = d["series"]
     if not series: return None
+    if max(dt for dt, _ in series) < CUTOFF: return None
     freq = detect_freq(series)
     full_n = len(series)
     full_range = f"{series[0][0]}~{series[-1][0]}"
     years_all = sorted({dt.year for dt, _ in series})
-    years = [str(y) for y in years_all[-max_years:]]
+    years = [str(y) for y in (years_all if max_years is None else years_all[-max_years:])]
     yset = set(int(y) for y in years)
     pts = [(dt, v) for dt, v in series if dt.year in yset]
 
@@ -383,6 +387,8 @@ for sid, title, subtitle, keys in SECTIONS:
     for k in keys:
         c = build_chart(k)
         if c: charts.append(c)
+    if not charts:            # 板块内图表全部停更 → 整个板块不输出
+        continue
     total_charts += len(charts)
     sheets.append({"id": sid, "title": title, "subtitle": subtitle + "｜仅供研究参考，不构成投资建议", "charts": charts})
 

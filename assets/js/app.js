@@ -40,7 +40,10 @@
     if (p[0] === "data" && p[1] && p[2]) {
       setNav("data"); viewSection(p[1], p[2], r.query);
     } else if (p[0] === "data" && p[1]) {
-      setNav("data"); viewCommodity(p[1]);
+      /* 品种页已移除：直接进该品种第一个板块 */
+      var com0 = getCom(p[1]);
+      if (com0 && com0.sheets[0]) { location.replace("#/data/" + com0.id + "/" + com0.sheets[0].id); return; }
+      setNav("data"); viewHome();
     } else if (p[0] === "data") {
       setNav("data"); viewHome();
     } else if (p[0] === "about") {
@@ -55,7 +58,7 @@
     var t = totals();
     var cards = COMS.map(function (c) {
       var first = c.sheets[0];
-      return '<a class="lib-card" style="--accent:' + c.color + '" href="#/data/' + c.id + '">' +
+      return '<a class="lib-card" style="--accent:' + c.color + '" href="#/data/' + c.id + "/" + (first ? first.id : "") + '">' +
         '<div class="lib-top"><span class="lib-name">' + esc(c.name) + "</span>" +
         '<span class="lib-tag">' + c.sheets.length + " 板块</span></div>" +
         '<div class="lib-desc">' + esc(first ? first.title.replace(/^\d+\s*/, "") + " 等" : "") + "</div>" +
@@ -107,7 +110,7 @@
     $("#view").innerHTML =
       '<div class="data-layout">' +
         '<aside class="sidebar">' +
-          '<div class="side-head"><a class="back" href="#/data/' + com.id + '">← ' + esc(com.name) + "</a>" +
+          '<div class="side-head"><a class="back" href="#/">← 品种库</a>' +
             '<h2 style="--accent:' + com.color + '">' + esc(com.name) + "数据库</h2>" +
             '<div class="side-sub">' + com.sheets.length + " 板块 / " + com.chartCount + " 张图</div>" +
           "</div>" +
@@ -190,7 +193,8 @@
 
     var canvas = $("canvas", el);
     var chart = null;
-    var visible = c.years.slice();
+    /* 历史年份全量保留在图例中，默认只显示最近 5 年，避免几十条线挤在一起 */
+    var visible = c.years.slice(-5);
 
     function buildLegend() {
       var lg = $(".legend", el);
@@ -207,6 +211,7 @@
         }).join("") + "</div>" +
         '<div class="lg-actions">' +
           '<button class="lg-btn" data-act="recent">近两年</button>' +
+          '<button class="lg-btn" data-act="recent5">近五年</button>' +
           '<button class="lg-btn" data-act="all">全部</button>' +
         "</div>";
       $$(".lg-item", lg).forEach(function (b) {
@@ -221,7 +226,9 @@
       $$(".lg-btn", lg).forEach(function (b) {
         b.addEventListener("click", function () {
           var act = b.getAttribute("data-act");
-          visible = act === "recent" ? c.years.slice(-2) : c.years.slice();
+          visible = act === "recent" ? c.years.slice(-2)
+                  : act === "recent5" ? c.years.slice(-5)
+                  : c.years.slice();
           if (chart) chart.only(visible);
           $$(".lg-item", lg).forEach(function (it) {
             it.classList.toggle("on", visible.indexOf(it.getAttribute("data-y")) >= 0);
@@ -234,6 +241,7 @@
       chart = global.LineChart.create(canvas, {
         labels: c.labels, years: c.years, series: c.series, unit: c.unit, freq: c.freq, height: 260,
       });
+      if (visible.length < c.years.length) chart.only(visible);
       charts.push(chart);
     }, 0);
     return el;
@@ -262,7 +270,7 @@
       "</tbody></table></div></section>" +
       '<section class="balance-block about-block"><div class="bb-head"><h2>品种覆盖</h2></div>' +
       '<div class="about-body"><ol class="about-list">' +
-      COMS.map(function (c) { return '<li><a href="#/data/' + c.id + '">' + esc(c.name) + "</a> · " + c.sheets.length + " 板块 / " + c.chartCount + " 图</li>"; }).join("") +
+      COMS.map(function (c) { return '<li><a href="#/data/' + c.id + "/" + (c.sheets[0] ? c.sheets[0].id : "") + '">' + esc(c.name) + "</a> · " + c.sheets.length + " 板块 / " + c.chartCount + " 图</li>"; }).join("") +
       "</ol></div></section>" +
       '<section class="balance-block about-block"><div class="bb-head"><h2>风险提示与免责声明</h2></div>' +
       '<div class="about-body legal">' +
