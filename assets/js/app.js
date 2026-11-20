@@ -203,11 +203,24 @@
           esc(c.unit || "年度值") + " · " + c.labels.length + " 个年度</span></div>";
         return;
       }
+      /* 颜色跟着「当前可见年份」走：只亮近几年时，这几年会被重新均匀上色，区分度更高 */
+      function visYears() {
+        return c.years.filter(function (y) { return visible.indexOf(y) >= 0; });
+      }
+      function colorOf(y) {
+        var v = visYears(), i = v.indexOf(y);
+        return i < 0 ? "#c9d3e2" : global.LineChart.color(i, v.length);
+      }
+      function refreshSwatches() {
+        $$(".lg-item", lg).forEach(function (b) {
+          var sw = $(".swatch", b);
+          if (sw) sw.style.background = colorOf(b.getAttribute("data-y"));
+        });
+      }
       lg.innerHTML =
-        '<div class="lg-years">' + c.years.map(function (y, i) {
-          var color = global.LineChart.color(i, c.years.length);
+        '<div class="lg-years">' + c.years.map(function (y) {
           return '<button class="lg-item' + (visible.indexOf(y) >= 0 ? " on" : "") +
-            '" data-y="' + esc(y) + '"><span class="swatch" style="background:' + color + '"></span>' + esc(y) + "</button>";
+            '" data-y="' + esc(y) + '"><span class="swatch" style="background:' + colorOf(y) + '"></span>' + esc(y) + "</button>";
         }).join("") + "</div>" +
         '<div class="lg-actions">' +
           '<button class="lg-btn" data-act="recent">近两年</button>' +
@@ -221,6 +234,7 @@
           chart.toggle(y);
           visible = c.years.filter(function (yy) { return !chart.hidden[yy]; });
           b.classList.toggle("on", !chart.hidden[y]);
+          refreshSwatches();
         });
       });
       $$(".lg-btn", lg).forEach(function (b) {
@@ -233,6 +247,7 @@
           $$(".lg-item", lg).forEach(function (it) {
             it.classList.toggle("on", visible.indexOf(it.getAttribute("data-y")) >= 0);
           });
+          refreshSwatches();
         });
       });
     }

@@ -9,20 +9,21 @@
 (function (global) {
   "use strict";
 
-  var PALETTE = ["#a3aec2", "#7396c8", "#3f9e8c", "#c08a1e", "#c4482c", "#8b5cf6"];
   var AXIS = "#d8dee8";
   var GRID = "rgba(20,35,60,0.07)";
   var TICK = "#6b7688";
   var FONT = '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
 
   function getColor(i, n) {
-    if (n <= PALETTE.length) {
-      // 最新年份用最亮的颜色：PALETTE 由旧到新
-      var start = PALETTE.length - n;
-      return PALETTE[start + i];
-    }
-    var hue = 210 + (i / Math.max(1, n - 1)) * 120;
-    return "hsl(" + Math.round(hue) + ",45%," + Math.round(45 + (i / Math.max(1, n - 1)) * 25) + "%)";
+    if (n <= 1) return "hsl(350,78%,46%)";
+    /* 按「当前可见年份」在全色相环上均匀铺开：相邻年份色相差 360/n 度，
+       最新年份固定收在红色（350°）且最深最饱和，最容易一眼抓到。 */
+    var step = 360 / n;
+    var t = n > 1 ? i / (n - 1) : 1;
+    var hue = ((350 - (n - 1 - i) * step) % 360 + 360) % 360;
+    var sat = 55 + t * 25;
+    var light = 60 - t * 14;
+    return "hsl(" + Math.round(hue) + "," + Math.round(sat) + "%," + Math.round(light) + "%)";
   }
 
   function niceCeil(v) {
@@ -156,13 +157,16 @@
       ctx.fillText(this.labels[i2], x, p.top + ph + 6);
     }
 
-    // 数据线
-    for (var yi = 0; yi < this.years.length; yi++) {
-      var yr = this.years[yi];
-      if (this.hidden[yr]) continue;
+    // 数据线（颜色按当前可见年份的序号分配，隐藏年份不占色位）
+    var visYears = [];
+    for (var vy = 0; vy < this.years.length; vy++) {
+      if (!this.hidden[this.years[vy]]) visYears.push(this.years[vy]);
+    }
+    for (var yi = 0; yi < visYears.length; yi++) {
+      var yr = visYears[yi];
       var arr = this.series[yr] || [];
-      var color = getColor(yi, this.years.length);
-      var isLast = yi === this.years.length - 1;
+      var color = getColor(yi, visYears.length);
+      var isLast = yi === visYears.length - 1;
       ctx.strokeStyle = color;
       ctx.lineWidth = isLast ? 2 : 1.2;
       ctx.globalAlpha = isLast ? 1 : 0.9;
@@ -190,12 +194,11 @@
       ctx.lineTo(hx, p.top + ph);
       ctx.stroke();
       ctx.setLineDash([]);
-      for (var yj = 0; yj < this.years.length; yj++) {
-        var yr2 = this.years[yj];
-        if (this.hidden[yr2]) continue;
+      for (var yj = 0; yj < visYears.length; yj++) {
+        var yr2 = visYears[yj];
         var v3 = (this.series[yr2] || [])[this.hoverIdx];
         if (v3 === null || v3 === undefined || isNaN(v3)) continue;
-        ctx.fillStyle = getColor(yj, this.years.length);
+        ctx.fillStyle = getColor(yj, visYears.length);
         ctx.beginPath();
         ctx.arc(hx, yAt(v3), 3, 0, Math.PI * 2);
         ctx.fill();
@@ -230,13 +233,16 @@
       this.tooltip = tip;
     }
     var rows = [];
-    for (var i = this.years.length - 1; i >= 0; i--) {
-      var yr = this.years[i];
-      if (this.hidden[yr]) continue;
+    var vis = [];
+    for (var k = 0; k < this.years.length; k++) {
+      if (!this.hidden[this.years[k]]) vis.push(this.years[k]);
+    }
+    for (var i = vis.length - 1; i >= 0; i--) {
+      var yr = vis[i];
       var v = (this.series[yr] || [])[this.hoverIdx];
       rows.push(
         '<div class="tip-row"><span class="dot" style="background:' +
-          getColor(i, this.years.length) + '"></span><span class="ty">' + yr +
+          getColor(i, vis.length) + '"></span><span class="ty">' + yr +
           '</span><span class="tv">' + (v === null || v === undefined ? "—" : fmtNum(v, this.unit)) +
           "</span></div>"
       );
