@@ -275,15 +275,22 @@ def detect_freq(series):
     return "year"
 
 # ---------- 季节性对齐 ----------
-# 数据止于该日之前的图表视为「停更」，整条丢弃（用户 2026-11-20 要求）
-CUTOFF = datetime.date(2025, 1, 1)
+# 停更判定（用户 2026-11-20 第二轮口径）：
+#   非年度数据 —— 数据止于 2026-01-01 之前视为停更，整条剔除
+#   年度数据   —— 本身一年一个点，最新年份 >= 2025 即视为有效，全保留
+CUTOFF = datetime.date(2026, 1, 1)
+ANNUAL_CUTOFF = datetime.date(2025, 1, 1)
 
 def build_chart(key, max_years=None):
     d = data[key]
     series = d["series"]
     if not series: return None
-    if max(dt for dt, _ in series) < CUTOFF: return None
     freq = detect_freq(series)
+    last_dt = max(dt for dt, _ in series)
+    if freq == "year":
+        if last_dt < ANNUAL_CUTOFF: return None
+    elif last_dt < CUTOFF:
+        return None
     full_n = len(series)
     full_range = f"{series[0][0]}~{series[-1][0]}"
     years_all = sorted({dt.year for dt, _ in series})
