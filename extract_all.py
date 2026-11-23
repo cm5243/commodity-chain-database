@@ -284,7 +284,7 @@ COMMODITIES = [
 ]
 
 JUNK_SHEET = re.compile(r"^(贸易商|交割库|装置\s*|V风|氯碱|1215|涨跌|声明)$")
-TODAY = datetime.date(2026, 11, 18)
+TODAY = datetime.date.today()   # 原先硬编码 2026-11-18，会把首页「截至」日期锁死
 
 def clean_sheet_title(sn):
     t = sn.strip()
