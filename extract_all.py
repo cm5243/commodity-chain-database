@@ -278,12 +278,13 @@ COMMODITIES = [
     ("2026/生猪数据库.xlsx", "hog", "生猪", "#c4482c"),
     ("2026/花生数据库.xlsx", "peanut", "花生", "#c08a1e"),
     ("2026/苹果数据库.xlsx", "apple", "苹果", "#c4482c"),
+    ("油脂数据库.xlsx", "oils", "油脂", "#b8791f"),
     ("化工基差.xls", "basis", "化工基差", "#7396c8"),
     ("商品市场总览.xlsx", "overview", "市场总览", "#8b5cf6"),
     ("宏观202512.xlsx", "macro", "宏观", "#3f9e8c"),
 ]
 
-JUNK_SHEET = re.compile(r"^(贸易商|交割库|装置\s*|V风|氯碱|1215|涨跌|声明)$")
+JUNK_SHEET = re.compile(r"^(贸易商|交割库|装置\s*|V风|氯碱|1215|涨跌|声明|说明|目录)$")
 TODAY = datetime.date.today()   # 原先硬编码 2026-11-18，会把首页「截至」日期锁死
 
 def clean_sheet_title(sn):
