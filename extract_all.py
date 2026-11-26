@@ -365,6 +365,36 @@ for rel, cid, cname, color in COMMODITIES:
     commodities.append(db)
     report.append((cname, len(sections), total, str(maxdate)))
 
+# ---------- 板块按「期现 → 利润 → 库存 → 供给 → 需求」统一重排 ----------
+# 匹配优先级：需求先于供给，避免「下游开工负荷」被「开工」抢成供给
+_CLASS_RULES = [
+    ("利润", r"利润|成本|盈亏|加工费|毛利|现金流|比价|原料"),
+    ("库存", r"库存|仓单|流通|库容|出库|持仓|成交额|成交量"),
+    ("期现", r"现货|期货|基差|价差|期现|盘面|行情|报价|价格|月差|跨期"),
+    ("需求", r"需求|消费|出口|销量|表需|下游|终端"),
+    ("供给", r"供给|供应|产量|开工|产能|进口|存栏|补栏|日龄|苗种|出栏|压榨|种植|到港"),
+]
+_CLASS_ORDER = {"期现": 0, "利润": 1, "库存": 2, "供给": 3, "需求": 4}
+
+def classify_sheet(title):
+    t = re.sub(r"^\d+\s*", "", title)
+    for name, pat in _CLASS_RULES:
+        if re.search(pat, t):
+            return name
+    return "其他"          # 综合指标 / 季节性 / 平衡表 / 宏观 等排在最后
+
+_reordered = 0
+for _com in commodities:
+    before = [s["title"] for s in _com["sheets"]]
+    _com["sheets"].sort(key=lambda s: _CLASS_ORDER.get(classify_sheet(s["title"]), 9))
+    for _i, _s in enumerate(_com["sheets"], 1):
+        base = re.sub(r"^\d+\s*", "", _s["title"])
+        _s["id"] = f"s{_i:02d}"
+        _s["title"] = f"{_i:02d} {base}"
+    if [s["title"] for s in _com["sheets"]] != before:
+        _reordered += 1
+print(f"板块重排：{_reordered} 个品种的板块顺序有变化")
+
 # ---------- 交叉去重（同一份数据只保留一处） ----------
 import hashlib
 
