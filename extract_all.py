@@ -256,6 +256,63 @@ def extract_sheet(rows):
             charts.append(ch)
     return charts
 
+def extract_pivot_sheet(rows):
+    """解析 Excel 透视表布局：行标签=月日、列=年份（如「9月6日」×「2024年」）
+    常规 extract_sheet 无法处理这种表，但它本身就是按年对齐的季节性数据，可直接还原成时间序列。"""
+    hdr = None
+    for i in range(min(30, len(rows))):
+        if any(isinstance(c, str) and c.strip() == "行标签" for c in rows[i]):
+            hdr = i
+            break
+    if hdr is None:
+        return []
+    starts = [ci for ci, c in enumerate(rows[hdr]) if isinstance(c, str) and c.strip() == "行标签"]
+    if not starts:
+        return []
+    charts = []
+    for bi, start in enumerate(starts):
+        end = starts[bi + 1] if bi + 1 < len(starts) else len(rows[hdr])
+        year_cols = {}
+        for ci in range(start + 1, end):
+            v = get(rows, hdr, ci)
+            if isinstance(v, str):
+                m = re.match(r"^(\d{4})\s*年$", v.strip())
+                if m:
+                    year_cols[ci] = int(m.group(1))
+        if not year_cols:
+            continue
+        title = str(get(rows, hdr - 1, start) or "").strip()
+        for pfx in ("求和项:", "计数项:", "平均值项:"):
+            if title.startswith(pfx):
+                title = title[len(pfx):].strip()
+        if not title:
+            title = f"透视表{bi + 1}"
+        pairs = {}
+        for ri in range(hdr + 1, len(rows)):
+            lab = get(rows, ri, start)
+            if not isinstance(lab, str):
+                continue
+            m = re.match(r"^(\d{1,2})月(\d{1,2})日$", lab.strip())
+            if not m:
+                continue
+            mo, dy = int(m.group(1)), int(m.group(2))
+            for ci, yr in year_cols.items():
+                v = to_num(get(rows, ri, ci))
+                if v is None:
+                    continue
+                try:
+                    dt = datetime.date(yr, mo, dy)
+                except ValueError:
+                    continue
+                if dt not in pairs:
+                    pairs[dt] = v
+        if len(pairs) < 8:
+            continue
+        ch = build_chart(title, infer_unit(title), sorted(pairs.items()))
+        if ch:
+            charts.append(ch)
+    return charts
+
 # ---------- 品种配置 ----------
 # (相对路径, id, 名称, 颜色)
 COMMODITIES = [
@@ -279,6 +336,7 @@ COMMODITIES = [
     ("2026/花生数据库.xlsx", "peanut", "花生", "#c08a1e"),
     ("2026/苹果数据库.xlsx", "apple", "苹果", "#c4482c"),
     ("油脂数据库.xlsx", "oils", "油脂", "#b8791f"),
+    ("豆粕数据库.xlsx", "meal", "豆粕", "#8a9a3b"),
     ("化工基差.xls", "basis", "化工基差", "#7396c8"),
     ("商品市场总览.xlsx", "overview", "市场总览", "#8b5cf6"),
     ("宏观202512.xlsx", "macro", "宏观", "#3f9e8c"),
@@ -338,6 +396,8 @@ for rel, cid, cname, color in COMMODITIES:
             continue
         try:
             charts = extract_sheet(rows)
+            if not charts:
+                charts = extract_pivot_sheet(rows)   # 透视表布局（行标签×年份列）
         except Exception:
             charts = []
         del rows
@@ -376,11 +436,16 @@ _CLASS_RULES = [
 ]
 _CLASS_ORDER = {"期现": 0, "利润": 1, "库存": 2, "供给": 3, "需求": 4}
 
+_SHORT_EXCLUDE = re.compile(r"宏观|海外|综合|总览|平衡|天气|关税|原料|丁二烯|顺丁")
+
 def classify_sheet(title):
     t = re.sub(r"^\d+\s*", "", title)
     for name, pat in _CLASS_RULES:
         if re.search(pat, t):
             return name
+    # 纯品种名的短标题（如「黄金」「白银」「欧线」「金银比」）视作价格总览
+    if len(t) <= 4 and not _SHORT_EXCLUDE.search(t):
+        return "期现"
     return "其他"          # 综合指标 / 季节性 / 平衡表 / 宏观 等排在最后
 
 _reordered = 0
